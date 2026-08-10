@@ -44,12 +44,21 @@ server.once('error', (error) => {
 server.listen(PORT, '127.0.0.1', () => {
   const pair = createPairingUrl({ origins: ORIGINS, port: PORT, token: TOKEN })
   const label = account.ready ? account.account || account.auth : 'chưa đăng nhập'
+  // In token RIÊNG, không chỉ nhúng trong link. App có ô dán tay cho ca không
+  // bấm được link (terminal ở máy khác qua SSH, link mở nhầm trình duyệt), mà
+  // token lại chỉ nằm lẫn sau `t=` trong URL — không ai đoán ra phải tự bóc nó
+  // ra, nên trên thực tế ô đó không có cách nào điền cho đúng.
   console.log(`
   Claude runner: 127.0.0.1:${PORT} — ${label}
 
-  Mở link này để app dùng Claude trên máy bạn:
+  Cách 1 — mở link này, app tự nối:
 
       ${pair}
+
+  Cách 2 — dán tay vào nút "Claude local" của app:
+
+      Địa chỉ : http://127.0.0.1:${PORT}
+      Token   : ${TOKEN}
 
   Giữ cửa sổ terminal này mở trong lúc làm việc.
   origins   ${[...ORIGINS].join(', ')}

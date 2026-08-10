@@ -95,6 +95,55 @@ const web = await completeJson({
 })
 allOk = t('web tool: WebSearch chạy được, searches đếm > 0', web.searches > 0 && Boolean(web.data?.publisher), `${web.searches} lượt · ${web.data?.publisher}`) && allOk
 
+// 6 ─ Qua HTTP, với lib THẬT. Đây là tổ hợp duy nhất `npm test` không chạm tới:
+// ở đó `createRunner` nhận một lib giả, còn bốn phép thử trên gọi thẳng lib.
+// Nghĩa là lớp HTTP và engine chưa bao giờ gặp nhau trong một phép kiểm — và đó
+// đúng là chỗ tốn nhiều thời gian nhất khi phải chẩn đoán một lượt chat hỏng.
+const { createRunner } = await import('../src/http.js')
+const lib = await import('../src/index.js')
+const http = await import('node:http')
+
+const ORIGIN = 'http://localhost:5173'
+const TOKEN = 'smoke-token'
+const server = createRunner({ origins: ORIGIN, token: TOKEN, lib, logger: { error() {} } })
+await new Promise((r) => server.listen(0, '127.0.0.1', r))
+const PORT = server.address().port
+
+const post = (path, payload) =>
+  new Promise((resolve, reject) => {
+    const body = JSON.stringify(payload)
+    const req = http.request(
+      { host: '127.0.0.1', port: PORT, path, method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body), Origin: ORIGIN, 'x-runner-token': TOKEN } },
+      (res) => {
+        let text = ''
+        res.on('data', (d) => (text += d))
+        res.on('end', () => resolve({ status: res.statusCode, text }))
+      },
+    )
+    req.on('error', reject)
+    req.write(body)
+    req.end()
+  })
+
+const httpJson = await post('/run', {
+  system: 'Bạn là API trả JSON.',
+  prompt: 'Thủ đô Việt Nam? {"city":"..."}',
+  schema: { type: 'object', additionalProperties: false, required: ['city'], properties: { city: { type: 'string' } } },
+})
+let hj = null
+try { hj = JSON.parse(httpJson.text) } catch { /* để nguyên null, phép thử dưới sẽ đỏ */ }
+allOk = t('HTTP /run: lib thật trả JSON đúng schema', httpJson.status === 200 && Boolean(hj?.data?.city), `${httpJson.status} · ${hj?.data?.city ?? httpJson.text.slice(0, 80)}`) && allOk
+
+// `/stream` phải trả TEXT THÔ, không phải JSON — client đọc nó bằng getReader().
+// Một lượt trả JSON ở đây sẽ hiện lên khung chat dưới dạng `{"ok":true,...}`.
+const httpStream = await post('/stream', { system: 'Trả lời cực ngắn.', prompt: 'Chào bằng tiếng Việt' })
+allOk = t('HTTP /stream: lib thật trả text thô, không phải JSON',
+  httpStream.status === 200 && httpStream.text.trim().length > 0 && !httpStream.text.trimStart().startsWith('{'),
+  JSON.stringify(httpStream.text.slice(0, 60))) && allOk
+
+server.close()
+
 const cost = json.cost + probe.cost + web.cost
 console.log(`\n  ${Date.now() - t0}ms · chi phí API tương đương ~$${cost.toFixed(4)} (subscription: không bị trừ)\n`)
 process.exit(allOk ? 0 : 1)

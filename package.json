@@ -1,0 +1,36 @@
+{
+  "name": "claude-runner",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Chạy Claude bằng Claude Code CLI đã đăng nhập trên máy này, mở qua một cổng loopback có CORS allowlist + token. Không biết gì về app gọi nó.",
+  "license": "MIT",
+  "bin": {
+    "claude-runner": "bin/claude-runner.js",
+    "claude-local": "bin/claude-local.js"
+  },
+  "exports": {
+    ".": "./src/index.js",
+    "./http": "./src/http.js"
+  },
+  "files": [
+    "src",
+    "bin",
+    "README.md"
+  ],
+  "scripts": {
+    "test": "node test/runner.mjs",
+    "status": "node bin/claude-local.js",
+    "smoke": "node test/smoke.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.3.223"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nguyennt02/claude-runner.git"
+  },
+  "homepage": "https://github.com/nguyennt02/claude-runner#readme"
+}

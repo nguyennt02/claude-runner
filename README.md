@@ -12,8 +12,11 @@ cung cấp — đều thuộc về phía app, không thuộc về đây.
 ## Dùng
 
 ```bash
-RUNNER_ORIGINS=https://app.example.com npx github:nguyennt02/claude-runner
+npx github:nguyennt02/claude-runner https://app.example.com
 ```
+
+Origin của app là **bắt buộc** — bộ chạy chỉ trả lời trang nào bạn nêu đích danh. Bỏ trống thì
+nó chỉ nhận `localhost:5173` (đường dev), và mọi request từ domain thật sẽ bị chặn ở CORS.
 
 Nó in ra một link ghép đôi. Mở link đó trên app để app biết đường gọi về máy bạn.
 
@@ -36,7 +39,7 @@ do chưa sẵn sàng.
 
 | Biến | Mặc định | |
 |---|---|---|
-| `RUNNER_ORIGINS` | `http://localhost:5173,http://127.0.0.1:5173` | Danh sách phẩy. **Không nhận `*`** |
+| tham số thứ nhất, hoặc `RUNNER_ORIGINS` | `http://localhost:5173,http://127.0.0.1:5173` | Danh sách phẩy. **Không nhận `*`** |
 | `RUNNER_PORT` | `8787` | |
 | `RUNNER_TOKEN` | tự sinh mỗi lần chạy | In ra lúc khởi động |
 | `CLAUDE_LOCAL_MODEL` | `claude-sonnet-5` | Model mặc định |

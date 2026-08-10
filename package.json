@@ -20,7 +20,8 @@
   "scripts": {
     "test": "node test/runner.mjs",
     "status": "node bin/claude-local.js",
-    "smoke": "node test/smoke.mjs"
+    "smoke": "node test/smoke.mjs",
+    "start": "node bin/claude-runner.js"
   },
   "engines": {
     "node": ">=18"

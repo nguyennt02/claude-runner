@@ -7,14 +7,19 @@ import * as lib from '../src/index.js'
 const PORT = Number(process.env.RUNNER_PORT || process.env.BRIDGE_PORT) || 8787
 const TOKEN = process.env.RUNNER_TOKEN || process.env.BRIDGE_TOKEN || createToken()
 
+// Origin nhận được theo THAM SỐ trước, env sau. Lý do là chuyện gõ phím: người
+// dùng cuối phải tự nhập origin của app họ, và `npx <pkg> https://app.example`
+// gõ đúng dễ hơn hẳn một tiền tố `RUNNER_ORIGINS=… ` đứng trước lệnh — mà gõ sai
+// origin thì mọi request bị chặn ở CORS, hiện ra là "không gọi được bộ chạy"
+// chứ không phải "origin sai".
 let ORIGINS
 try {
-  ORIGINS = parseOrigins(process.env.RUNNER_ORIGINS || process.env.BRIDGE_ORIGINS, [
+  ORIGINS = parseOrigins(process.argv.slice(2).join(',') || process.env.RUNNER_ORIGINS || process.env.BRIDGE_ORIGINS, [
     'http://localhost:5173',
     'http://127.0.0.1:5173',
   ])
 } catch (e) {
-  console.error(`\n  ${e.message}\n  Ví dụ: RUNNER_ORIGINS=https://app.example.com npx claude-runner\n`)
+  console.error(`\n  ${e.message}\n  Ví dụ: npx github:<owner>/claude-runner https://app.example.com\n`)
   process.exit(1)
 }
 

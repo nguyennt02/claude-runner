@@ -35,7 +35,32 @@ if (!account.ready) {
 const server = createRunner({ origins: ORIGINS, token: TOKEN, lib })
 
 server.once('error', (error) => {
-  console.error(`\n  Runner không khởi động được: ${error.message}\n`)
+  // `EADDRINUSE` gần như luôn là MỘT BỘ CHẠY CŨ còn sống, và ca đó độc ở chỗ nó
+  // hỏng theo hai nửa rời nhau: lệnh mới chết ở đây, còn cái đang giữ cổng thì
+  // vẫn trả lời — chỉ là cho một origin khác. Người dùng thấy app báo "không gọi
+  // được bộ chạy" và thấy lệnh vừa gõ đã tắt, mà không có gì nối hai chuyện đó.
+  //
+  // Nguyên văn `error.message` của Node không nói được nửa nào trong đó, nên nó
+  // là một dòng đúng mà vô dụng. Việc phải làm mới là thứ cần in ra.
+  if (error?.code === 'EADDRINUSE') {
+    console.error(`
+  Cổng ${PORT} đang có người giữ — nhiều khả năng là một bộ chạy cũ vẫn còn sống.
+
+      lsof -nP -iTCP:${PORT} -sTCP:LISTEN    # xem ai đang giữ
+      kill <PID>                             # tắt nó rồi chạy lại lệnh này
+
+  ⚠️  Bộ chạy cũ đó có thể đang phục vụ một ORIGIN KHÁC. Khi ấy app vẫn báo
+      "không gọi được bộ chạy" dù cổng có trả lời — vì nó bị từ chối ở CORS,
+      và trình duyệt không đọc được lý do. Kiểm nhanh:
+
+      curl -s -o /dev/null -w '%{http_code}\\n' -H 'Origin: <origin của app>' \\
+        http://127.0.0.1:${PORT}/ping        # 200 = đúng · 403 = sai origin
+
+  Hoặc chạy cổng khác: RUNNER_PORT=${PORT + 1}
+`)
+  } else {
+    console.error(`\n  Runner không khởi động được: ${error.message}\n`)
+  }
   process.exitCode = 1
 })
 

@@ -126,7 +126,13 @@ const stubLib = {
   },
 }
 
-const server = createRunner({ origins: ORIGIN, token: TOKEN, lib: stubLib, logger: { error() {} } })
+const warnings = []
+const server = createRunner({
+  origins: ORIGIN,
+  token: TOKEN,
+  lib: stubLib,
+  logger: { error() {}, warn: (m) => warnings.push(String(m)) },
+})
 await new Promise((r) => server.listen(0, '127.0.0.1', r))
 const PORT = server.address().port
 
@@ -161,6 +167,37 @@ let r = await hit('/ping', { origin: 'https://evil.example', method: 'GET' })
 check('http: origin lạ → 403, không lộ cả sự tồn tại', r.status === 403)
 r = await hit('/status', { origin: 'https://evil.example', token: TOKEN })
 check('http: origin lạ + token đúng vẫn 403 (CORS đứng trước token)', r.status === 403)
+
+// ── Origin bị từ chối phải NÓI RA ở terminal ────────────────────────────────
+// Cái 403 trên cố ý không kèm header CORS, nên trình duyệt chỉ thấy một
+// `TypeError` giống hệt ca "không có gì lắng nghe". Terminal là chỗ DUY NHẤT
+// nói được sự thật, và im lặng ở đây đã tốn một buổi truy tay: một bộ chạy cũ
+// phục vụ origin của bản dev vẫn trả lời trên đúng cổng, còn app thì báo "không
+// gọi được bộ chạy".
+{
+  const said = warnings.join('\n')
+  check('log: origin bị từ chối được nói ra ở terminal', /evil\.example/.test(said))
+  // Phải nêu CẢ HAI vế — origin bị từ chối và origin đang phục vụ. Chỉ có vế đầu
+  // thì người đọc vẫn không biết phải bật lại bằng cái gì.
+  check('log: nói luôn bộ chạy này đang phục vụ origin nào', said.includes(ORIGIN))
+  // Và phải nói rằng app KHÔNG đọc được dòng này — nếu không, người đọc sẽ chờ
+  // một câu lỗi tương ứng hiện lên trong trình duyệt, mà nó không bao giờ tới.
+  check('log: nói rõ phía app không đọc được lý do này', /KHÔNG đọc được/.test(said))
+
+  const before = warnings.length
+  await hit('/ping', { origin: 'https://evil.example', method: 'GET' })
+  await hit('/ping', { origin: 'https://evil.example', method: 'GET' })
+  // Mỗi origin đúng MỘT lần. Một trang bất kỳ cũng dò được 127.0.0.1, và một
+  // vòng retry biến cảnh báo này thành rác che mất mọi thứ khác — tức làm hỏng
+  // đúng thứ nó sinh ra để sửa.
+  check('log: mỗi origin chỉ cảnh báo một lần, không thành rác', warnings.length === before)
+
+  const n = warnings.length
+  await hit('/ping', { origin: '', method: 'GET' })
+  // Không có header Origin thì đó không phải một trang web (curl, máy quét
+  // cổng), và câu "app của bạn" sai địa chỉ ở ca đó.
+  check('log: request không có Origin thì không cảnh báo', warnings.length === n)
+}
 
 r = await hit('/ping', { method: 'GET' })
 check('http: /ping mở cho origin hợp lệ, không cần token', r.status === 200 && JSON.parse(r.text).ok === true)

@@ -130,6 +130,35 @@ export function createRunner({ origins, token, lib, logger = console }) {
     return true
   }
 
+  // Một origin bị từ chối là thứ TRÌNH DUYỆT KHÔNG BAO GIỜ ĐỌC ĐƯỢC: cái 403
+  // dưới cố ý không kèm header CORS, nên phía app chỉ nhận đúng cái `TypeError`
+  // của ca "không có gì lắng nghe". Terminal này là chỗ DUY NHẤT sự thật đó nói
+  // ra được — và cũng chính là chỗ người dùng đang nhìn khi đi tìm nguyên nhân.
+  //
+  // Không nói ra thì hai nửa của cùng một sự việc nằm ở hai chỗ, mỗi chỗ thiếu
+  // đúng mảnh của chỗ kia: app biết "gọi không được" mà không biết vì sao, còn
+  // chỗ biết vì sao thì im lặng.
+  //
+  // ⚠️ Mỗi origin chỉ nói MỘT lần. Bất kỳ trang nào đang mở cũng dò được
+  // 127.0.0.1, và một vòng retry sẽ biến cảnh báo này thành rác che mất mọi thứ
+  // khác — tức là làm hỏng đúng thứ nó sinh ra để sửa.
+  const warned = new Set()
+  function warnRejected(raw) {
+    // Không có header `Origin` thì đó không phải một trang web (curl, máy quét
+    // cổng). Câu dưới nói về "app của bạn" nên nó sai địa chỉ ở ca đó.
+    if (!raw) return
+    const origin = normalizeOrigin(raw) || String(raw)
+    if (warned.has(origin)) return
+    warned.add(origin)
+    logger.warn?.(`
+  ⚠️  Từ chối một trang ở origin  ${origin}
+      Bộ chạy này chỉ phục vụ:    ${[...allowedOrigins].join(', ')}
+
+      Nếu đó là app của bạn: tắt bộ chạy (Ctrl-C) rồi chạy lại với chính origin đó.
+      Phía app chỉ báo được "không gọi được bộ chạy" — nó KHÔNG đọc được dòng này.
+`)
+  }
+
   const json = (res, status, obj) => {
     res.statusCode = status
     res.setHeader('Content-Type', 'application/json')
@@ -142,6 +171,7 @@ export function createRunner({ origins, token, lib, logger = console }) {
     // Origin lạ bị chặn TRƯỚC mọi thứ, kể cả /ping: một trang bất kỳ đang mở
     // cũng dò được 127.0.0.1, và nó không nên biết cả việc "có cái gì ở đây".
     if (!cors(req, res)) {
+      warnRejected(req.headers.origin)
       res.statusCode = 403
       res.end('forbidden origin')
       return
